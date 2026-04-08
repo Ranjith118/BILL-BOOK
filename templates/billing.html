@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% block title %}- New Bill{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-4"><i class="bi bi-plus-circle me-2 text-danger"></i>Create New Bill</h4>
+
+<form method="POST" id="billForm">
+<div class="row g-4">
+  <!-- Left: Customer + Items -->
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <label class="form-label fw-semibold">Select Customer <span class="text-danger">*</span></label>
+        <select name="customer_id" class="form-select" required>
+          <option value="">-- Choose Customer --</option>
+          {% for c in customers %}
+          <option value="{{ c.customer_id }}">{{ c.name }} ({{ c.phone or 'No phone' }})</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Barcode scanner input -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body">
+        <label class="form-label fw-semibold"><i class="bi bi-upc-scan me-1"></i>Scan Barcode / Search Product</label>
+        <div class="input-group">
+          <input type="text" id="barcodeInput" class="form-control" placeholder="Scan barcode or type product name..."/>
+          <select id="productSelect" class="form-select" style="max-width:250px">
+            <option value="">-- Or select product --</option>
+            {% for p in products %}
+            <option value="{{ p.product_id }}" data-price="{{ p.price }}" data-gst="{{ p.gst }}" data-stock="{{ p.stock }}" data-name="{{ p.name }}">
+              {{ p.name }} (Rs.{{ "%.2f"|format(p.price) }}) [Stock: {{ p.stock }}]
+            </option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-outline-dark" onclick="addItemFromSelect()">
+            <i class="bi bi-plus-lg"></i> Add
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items table -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold border-0 d-flex justify-content-between align-items-center">
+        <span>Bill Items</span>
+        <span class="badge bg-primary" id="itemCount">0 items</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0" id="itemsTable">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th><th>Product</th>
+              <th style="width:90px">Qty</th>
+              <th>Unit Price</th><th>GST%</th><th>Amount</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            <tr id="emptyRow"><td colspan="7" class="text-center text-muted py-3">No items added yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Summary -->
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm sticky-top" style="top:80px">
+      <div class="card-header bg-dark text-white fw-semibold">Bill Summary</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <span>Subtotal</span><span id="subtotalDisplay">Rs.0.00</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span>GST</span><span id="gstDisplay">Rs.0.00</span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Discount (Rs.)</label>
+          <input type="number" step="0.01" name="discount" id="discountInput" class="form-control form-control-sm" value="0" min="0" oninput="recalculate()"/>
+        </div>
+        <hr/>
+        <div class="d-flex justify-content-between fw-bold fs-5 mb-3">
+          <span>TOTAL</span><span id="totalDisplay" class="text-danger">Rs.0.00</span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Payment Method</label>
+          <select name="payment_method" class="form-select form-select-sm">
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="upi">UPI</option>
+            <option value="netbanking">Net Banking</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Payment Status</label>
+          <select name="payment_status" class="form-select form-select-sm">
+            <option value="paid">Paid</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Notes / Terms & Conditions <span class="text-muted">(optional)</span></label>
+          <textarea name="notes" class="form-control form-control-sm" rows="3"
+                    placeholder="e.g. Payment due within 7 days. Goods once sold will not be returned...">{{ default_terms }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-danger w-100 fw-bold" id="submitBtn" disabled>
+          <i class="bi bi-receipt me-2"></i>Generate Invoice
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let items = [];
+
+document.getElementById('barcodeInput').addEventListener('keydown', async function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const code = this.value.trim();
+    if (!code) return;
+    const res = await fetch(`/api/product/barcode/${encodeURIComponent(code)}`);
+    if (res.ok) {
+      const p = await res.json();
+      addItem(p.id, p.name, p.price, p.gst, p.stock);
+      this.value = '';
+    } else {
+      alert('Product not found for barcode: ' + code);
+    }
+  }
+});
+
+function addItemFromSelect() {
+  const sel = document.getElementById('productSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
+  addItem(opt.value, opt.dataset.name, parseFloat(opt.dataset.price),
+          parseFloat(opt.dataset.gst), parseInt(opt.dataset.stock));
+  sel.value = '';
+}
+
+function addItem(id, name, price, gst, stock) {
+  const existing = items.find(i => i.id == id);
+  if (existing) {
+    existing.qty++;
+    renderItems();
+    return;
+  }
+  items.push({ id, name, price, gst, stock, qty: 1 });
+  renderItems();
+}
+
+function renderItems() {
+  const tbody = document.getElementById('itemsBody');
+  document.getElementById('itemCount').textContent = items.length + ' item' + (items.length !== 1 ? 's' : '');
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr id="emptyRow"><td colspan="7" class="text-center text-muted py-3">No items added yet.</td></tr>';
+    document.getElementById('submitBtn').disabled = true;
+    recalculate();
+    return;
+  }
+  tbody.innerHTML = items.map((item, idx) => `
+    <tr>
+      <td class="text-muted small">${idx + 1}</td>
+      <td>
+        <span class="fw-semibold">${item.name}</span>
+        <input type="hidden" name="product_id[]" value="${item.id}"/>
+        ${item.stock < 5 ? '<br><span class="badge bg-warning text-dark" style="font-size:0.65rem">Low Stock</span>' : ''}
+      </td>
+      <td>
+        <input type="number" name="quantity[]" class="form-control form-control-sm" value="${item.qty}"
+          min="1" max="${item.stock}" onchange="updateQty(${idx}, this.value)" style="width:70px"/>
+      </td>
+      <td>Rs.${item.price.toFixed(2)}</td>
+      <td>${item.gst}%</td>
+      <td class="fw-semibold text-danger">Rs.${(item.qty * item.price * (1 + item.gst/100)).toFixed(2)}</td>
+      <td>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItem(${idx})">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('submitBtn').disabled = false;
+  recalculate();
+}
+
+function updateQty(idx, val) {
+  items[idx].qty = Math.max(1, parseInt(val) || 1);
+  renderItems();
+}
+
+function removeItem(idx) {
+  items.splice(idx, 1);
+  renderItems();
+}
+
+function recalculate() {
+  let subtotal = 0, gstTotal = 0;
+  items.forEach(i => {
+    subtotal += i.qty * i.price;
+    gstTotal += i.qty * i.price * i.gst / 100;
+  });
+  const discount = parseFloat(document.getElementById('discountInput').value) || 0;
+  const total = subtotal + gstTotal - discount;
+  document.getElementById('subtotalDisplay').textContent = 'Rs.' + subtotal.toFixed(2);
+  document.getElementById('gstDisplay').textContent = 'Rs.' + gstTotal.toFixed(2);
+  document.getElementById('totalDisplay').textContent = 'Rs.' + Math.max(0, total).toFixed(2);
+}
+</script>
+{% endblock %}

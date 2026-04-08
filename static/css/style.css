@@ -1,0 +1,53 @@
+body {
+  background-color: #f4f6f9;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.navbar {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.stat-card {
+  border-radius: 12px;
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+}
+
+.card {
+  border-radius: 12px;
+}
+
+.table thead th {
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+}
+
+.btn {
+  border-radius: 8px;
+}
+
+.form-control, .form-select {
+  border-radius: 8px;
+}
+
+.badge {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-radius: 6px;
+}
+
+/* Invoice print styles */
+@media print {
+  body { background: white; }
+  .no-print, nav, .alert, .container-fluid > *:not(#invoicePrint) { display: none !important; }
+  #invoicePrint { box-shadow: none !important; }
+}
+
+/* Prevent chart canvas flicker/repeat */
+canvas {
+  display: block !important;
+  max-width: 100%;
+}

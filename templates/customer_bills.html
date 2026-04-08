@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}- {{ customer.name }} Bills{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">
+      <i class="bi bi-clock-history me-2 text-info"></i>{{ customer.name }}
+    </h4>
+    <small class="text-muted">{{ customer.phone or '' }} {{ '| ' + customer.email if customer.email else '' }}</small>
+  </div>
+  <a href="{{ url_for('customers') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm bg-primary text-white">
+      <div class="card-body text-center py-3">
+        <p class="small mb-1 opacity-75">Total Bills</p>
+        <h4 class="fw-bold mb-0">{{ bills|length }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm bg-success text-white">
+      <div class="card-body text-center py-3">
+        <p class="small mb-1 opacity-75">Total Spent</p>
+        <h4 class="fw-bold mb-0">Rs.{{ "%.2f"|format(total_spent) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm bg-warning text-dark">
+      <div class="card-body text-center py-3">
+        <p class="small mb-1 opacity-75">Avg Bill Value</p>
+        <h4 class="fw-bold mb-0">
+          Rs.{{ "%.2f"|format(total_spent / bills|length) if bills else "0.00" }}
+        </h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm bg-danger text-white">
+      <div class="card-body text-center py-3">
+        <p class="small mb-1 opacity-75">Last Purchase</p>
+        <h5 class="fw-bold mb-0">
+          {{ bills[0].date.strftime('%d %b %Y') if bills else 'Never' }}
+        </h5>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bills table -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold border-0">
+    <i class="bi bi-receipt me-2 text-primary"></i>All Bills
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Bill #</th><th>Date</th><th>Items</th>
+          <th>Subtotal</th><th>GST</th><th>Discount</th>
+          <th>Total</th><th>Payment</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in bills %}
+        <tr>
+          <td><span class="badge bg-secondary">#{{ b.bill_id }}</span></td>
+          <td>{{ b.date.strftime('%d %b %Y, %I:%M %p') }}</td>
+          <td>{{ b.items|length }}</td>
+          <td>Rs.{{ "%.2f"|format(b.subtotal) }}</td>
+          <td>Rs.{{ "%.2f"|format(b.gst_amount) }}</td>
+          <td class="text-success">- Rs.{{ "%.2f"|format(b.discount) }}</td>
+          <td class="fw-bold text-danger">Rs.{{ "%.2f"|format(b.total_amount) }}</td>
+          <td><span class="badge bg-info text-dark">{{ b.payment_method.upper() }}</span></td>
+          <td>
+            <a href="{{ url_for('invoice', bill_id=b.bill_id) }}" class="btn btn-sm btn-outline-primary me-1">
+              <i class="bi bi-eye"></i>
+            </a>
+            <a href="{{ url_for('invoice_pdf_download', bill_id=b.bill_id) }}" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-file-pdf"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-4">No bills found for this customer.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

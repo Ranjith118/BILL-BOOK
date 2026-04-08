@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}- Bill History{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-4"><i class="bi bi-journal-text me-2 text-primary"></i>Bill History</h4>
+
+<form class="row g-2 mb-3" method="GET" id="filterForm">
+  <div class="col-auto">
+    <input type="number" name="q" class="form-control form-control-sm" 
+           placeholder="Search by Bill #" value="{{ q }}" min="1"/>
+  </div>
+  <div class="col-auto">
+    <input type="date" name="date" class="form-control form-control-sm" value="{{ date_filter }}"/>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-primary" type="submit">
+      <i class="bi bi-search"></i> Filter
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-danger ms-1" onclick="clearFilters()">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>Bill #</th><th>Customer</th><th>Date</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for b in bills %}
+        <tr>
+          <td><span class="badge bg-secondary">#{{ b.bill_id }}</span></td>
+          <td class="fw-semibold">{{ b.customer.name }}</td>
+          <td>{{ b.date.strftime('%d %b %Y, %I:%M %p') }}</td>
+          <td>{{ b.items|length }} item(s)</td>
+          <td class="fw-bold text-danger">Rs.{{ "%.2f"|format(b.total_amount) }}</td>
+          <td><span class="badge bg-info text-dark">{{ b.payment_method.upper() }}</span></td>
+          <td>
+            <a href="{{ url_for('invoice', bill_id=b.bill_id) }}" class="btn btn-sm btn-outline-primary me-1">
+              <i class="bi bi-eye"></i>
+            </a>
+            <a href="{{ url_for('invoice_pdf_download', bill_id=b.bill_id) }}" class="btn btn-sm btn-outline-danger me-1">
+              <i class="bi bi-file-pdf"></i>
+            </a>
+            <a href="{{ url_for('invoice_share', bill_id=b.bill_id) }}" target="_blank" class="btn btn-sm btn-outline-success me-1" title="Share">
+              <i class="bi bi-share"></i>
+            </a>
+            {% if current_user.role == 'admin' %}
+            <form method="POST" action="{{ url_for('delete_bill', bill_id=b.bill_id) }}" class="d-inline"
+                  onsubmit="return confirm('Delete bill #{{ b.bill_id }}?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No bills found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function clearFilters() {
+  document.querySelector('input[name="q"]').value = '';
+  document.querySelector('input[name="date"]').value = '';
+  document.getElementById('filterForm').submit();
+}
+</script>
+{% endblock %}

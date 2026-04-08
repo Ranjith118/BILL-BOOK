@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}- Products{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-warning"></i>Products</h4>
+  <a href="{{ url_for('add_product') }}" class="btn btn-warning btn-sm text-dark">
+    <i class="bi bi-plus-lg me-1"></i>Add Product
+  </a>
+</div>
+
+<form class="mb-3" method="GET">
+  <div class="input-group" style="max-width:350px">
+    <input type="text" name="q" class="form-control" placeholder="Search by name or category..." value="{{ q }}"/>
+    <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+  </div>
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>#</th><th>Name</th><th>Category</th><th>Price</th><th>GST%</th><th>Stock</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td>{{ p.product_id }}</td>
+          <td class="fw-semibold">{{ p.name }}</td>
+          <td>{{ p.category or '-' }}</td>
+          <td>Rs.{{ "%.2f"|format(p.price) }}</td>
+          <td>{{ p.gst }}%</td>
+          <td>
+            {% if p.stock < 5 %}
+              <span class="badge bg-danger">{{ p.stock }} ⚠ Low</span>
+            {% else %}
+              <span class="badge bg-success">{{ p.stock }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('edit_product', id=p.product_id) }}" class="btn btn-sm btn-outline-primary me-1">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="POST" action="{{ url_for('delete_product', id=p.product_id) }}" class="d-inline"
+                  onsubmit="return confirm('Delete this product?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No products found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

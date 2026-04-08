@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}- Profile{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-bold border-0 pt-4 ps-4">
+        <i class="bi bi-person-circle me-2 text-warning"></i>My Profile
+      </div>
+      <div class="card-body p-4">
+        <div class="text-center mb-4">
+          <div class="rounded-circle bg-danger text-white d-inline-flex align-items-center justify-content-center"
+               style="width:70px;height:70px;font-size:1.8rem;font-weight:bold;">
+            {{ user.full_name[0].upper() }}
+          </div>
+          <p class="mt-2 mb-0 fw-semibold">{{ user.email }}</p>
+          <span class="badge bg-{{ 'danger' if user.role == 'admin' else 'info text-dark' }}">{{ user.role }}</span>
+        </div>
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="full_name" class="form-control" value="{{ user.full_name }}" required/>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Date of Birth</label>
+            <input type="date" name="dob" class="form-control"
+                   value="{{ user.dob.strftime('%Y-%m-%d') if user.dob else '' }}"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted">Email (cannot change)</label>
+            <input type="text" class="form-control" value="{{ user.email }}" disabled/>
+          </div>
+          <button type="submit" class="btn btn-warning w-100 fw-bold">
+            <i class="bi bi-save me-1"></i>Save Changes
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

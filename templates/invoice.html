@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}- Invoice #{{ bill.bill_id }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+  <h4 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-danger"></i>Invoice #{{ bill.bill_id }}</h4>
+  <div class="d-flex gap-2 flex-wrap">
+    <button onclick="window.print()" class="btn btn-outline-dark btn-sm">
+      <i class="bi bi-printer me-1"></i>Print
+    </button>
+    <a href="{{ url_for('invoice_pdf', bill_id=bill.bill_id) }}" target="_blank" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-eye me-1"></i>View PDF
+    </a>
+    <a href="{{ url_for('invoice_pdf_download', bill_id=bill.bill_id) }}" class="btn btn-danger btn-sm">
+      <i class="bi bi-download me-1"></i>Download PDF
+    </a>
+    <!-- WhatsApp Share -->
+    <a href="https://wa.me/?text=Your%20Invoice%20%23{{ bill.bill_id }}%20from%20{{ biz.name if biz else 'BillBook' }}%20-%20Total%3A%20Rs.{{ '%.2f'|format(bill.total_amount) }}%0AView%3A%20{{ pdf_url | urlencode }}"
+       target="_blank" class="btn btn-success btn-sm">
+      <i class="bi bi-whatsapp me-1"></i>WhatsApp
+    </a>
+    <!-- Copy share link -->
+    <button class="btn btn-outline-secondary btn-sm" onclick="copyShareLink()" id="copyBtn">
+      <i class="bi bi-link-45deg me-1"></i>Copy Link
+    </button>
+    <a href="{{ url_for('billing') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-plus me-1"></i>New Bill
+    </a>
+    <!-- Email invoice -->
+    {% if bill.customer.email %}
+    <form method="POST" action="{{ url_for('email_invoice', bill_id=bill.bill_id) }}" class="d-inline">
+      <button class="btn btn-outline-info btn-sm">
+        <i class="bi bi-envelope me-1"></i>Email to Customer
+      </button>
+    </form>
+    {% endif %}
+    <!-- Duplicate bill -->
+    <form method="POST" action="{{ url_for('duplicate_bill', bill_id=bill.bill_id) }}" class="d-inline"
+          onsubmit="return confirm('Duplicate this bill?')">
+      <button class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-copy me-1"></i>Duplicate
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Share link bar -->
+<div class="alert alert-info d-flex align-items-center gap-2 no-print py-2 mb-3" id="shareLinkBar" style="display:none!important">
+  <i class="bi bi-share"></i>
+  <span class="small me-2">Shareable link:</span>
+  <code id="shareUrl" class="flex-grow-1 small">{{ url_for('invoice_share', bill_id=bill.bill_id, _external=True) }}</code>
+  <button class="btn btn-sm btn-info" onclick="copyShareLink()"><i class="bi bi-clipboard"></i></button>
+</div>
+
+<div class="card border-0 shadow-sm" id="invoicePrint">
+  <div class="card-body p-5">
+    <!-- Header -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        {% if biz %}
+          {% if biz.logo %}
+            <img src="{{ url_for('static', filename='images/' + biz.logo) }}" height="60" class="mb-2"/>
+          {% endif %}
+          <h4 class="fw-bold mb-1">{{ biz.name }}</h4>
+          <p class="text-muted small mb-0">{{ biz.address }}</p>
+          <p class="text-muted small mb-0">Phone: {{ biz.phone }} | Email: {{ biz.email }}</p>
+          <p class="text-muted small">GST: {{ biz.gst_number }}</p>
+        {% else %}
+          <h4 class="fw-bold">Your Business</h4>
+        {% endif %}
+      </div>
+      <div class="col-md-6 text-md-end">
+        <h2 class="fw-bold text-danger">INVOICE</h2>
+        <p class="mb-1"><strong>Invoice #:</strong> {{ bill.bill_id }}</p>
+        <p class="mb-1"><strong>Date:</strong> {{ bill.date.strftime('%d %b %Y, %I:%M %p') }}</p>
+        <p class="mb-0"><strong>Payment:</strong> {{ bill.payment_method.upper() }}</p>
+      </div>
+    </div>
+
+    <!-- Customer -->
+    <div class="bg-light rounded p-3 mb-4">
+      <strong>Bill To:</strong>
+      <p class="mb-0 mt-1">{{ bill.customer.name }}</p>
+      <p class="mb-0 text-muted small">{{ bill.customer.phone or '' }} {% if bill.customer.email %}| {{ bill.customer.email }}{% endif %}</p>
+      <p class="mb-0 text-muted small">{{ bill.customer.address or '' }}</p>
+    </div>
+
+    <!-- Items -->
+    <table class="table table-bordered align-middle mb-4">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th><th>Product</th><th class="text-center">Qty</th>
+          <th class="text-end">Unit Price</th><th class="text-center">GST%</th><th class="text-end">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in bill.items %}
+        {% set amount = item.quantity * item.price * (1 + item.gst / 100) %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item.product.name }}</td>
+          <td class="text-center">{{ item.quantity }}</td>
+          <td class="text-end">Rs.{{ "%.2f"|format(item.price) }}</td>
+          <td class="text-center">{{ item.gst }}%</td>
+          <td class="text-end fw-semibold">Rs.{{ "%.2f"|format(amount) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="row justify-content-end">
+      <div class="col-md-4">
+        <table class="table table-sm">
+          <tr><td>Subtotal</td><td class="text-end">Rs.{{ "%.2f"|format(bill.subtotal) }}</td></tr>
+          <tr><td>GST</td><td class="text-end">Rs.{{ "%.2f"|format(bill.gst_amount) }}</td></tr>
+          <tr><td>Discount</td><td class="text-end text-success">- Rs.{{ "%.2f"|format(bill.discount) }}</td></tr>
+          <tr class="table-dark fw-bold fs-5">
+            <td>TOTAL</td><td class="text-end">Rs.{{ "%.2f"|format(bill.total_amount) }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <hr/>
+    {% if bill.notes %}
+    <p class="text-muted small"><strong>Notes:</strong> {{ bill.notes }}</p>
+    {% endif %}
+    <p class="mb-1 small">
+      Payment Status:
+      <span class="badge {{ 'bg-success' if bill.payment_status == 'paid' else 'bg-warning text-dark' if bill.payment_status == 'partial' else 'bg-danger' }}">
+        {{ (bill.payment_status or 'paid').upper() }}
+      </span>
+    </p>
+    <p class="text-center text-muted small mt-3">Thank you for your business!</p>  </div>
+</div>
+
+<style>
+@media print {
+  .no-print, nav, .alert { display: none !important; }
+  .card { box-shadow: none !important; border: none !important; }
+  body { padding: 0; }
+}
+</style>
+
+{% block scripts %}
+<script>
+function copyShareLink() {
+  const url = "{{ url_for('invoice_share', bill_id=bill.bill_id, _external=True) }}";
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Copied!';
+    btn.classList.replace('btn-outline-secondary', 'btn-success');
+    setTimeout(() => {
+      btn.innerHTML = '<i class="bi bi-link-45deg me-1"></i>Copy Link';
+      btn.classList.replace('btn-success', 'btn-outline-secondary');
+    }, 2000);
+  });
+}
+</script>
+{% endblock %}
+{% endblock %}

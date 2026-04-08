@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Invoice #{{ bill.bill_id }} - {{ biz.name if biz else 'BillBook' }}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+  <!-- Open Graph for WhatsApp/social preview -->
+  <meta property="og:title" content="Invoice #{{ bill.bill_id }} - {{ biz.name if biz else 'BillBook' }}"/>
+  <meta property="og:description" content="Total: Rs.{{ '%.2f'|format(bill.total_amount) }} | Customer: {{ bill.customer.name }}"/>
+  <style>
+    body { background: #f4f6f9; }
+    .invoice-box { max-width: 720px; margin: 40px auto; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body>
+<div class="invoice-box">
+
+  <!-- Action bar -->
+  <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <span class="text-muted small"><i class="bi bi-share me-1"></i>Shared Invoice</span>
+    <div class="d-flex gap-2">
+      <button onclick="window.print()" class="btn btn-outline-dark btn-sm">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+      <a href="/invoice/{{ bill.bill_id }}/download" class="btn btn-danger btn-sm">
+        <i class="bi bi-download me-1"></i>Download PDF
+      </a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-5">
+
+      <!-- Header -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          {% if biz %}
+            {% if biz.logo %}
+              <img src="/static/images/{{ biz.logo }}" height="60" class="mb-2"/>
+            {% endif %}
+            <h4 class="fw-bold mb-1">{{ biz.name }}</h4>
+            <p class="text-muted small mb-0">{{ biz.address }}</p>
+            <p class="text-muted small mb-0">Phone: {{ biz.phone }}</p>
+            <p class="text-muted small">GST: {{ biz.gst_number }}</p>
+          {% else %}
+            <h4 class="fw-bold">BillBook</h4>
+          {% endif %}
+        </div>
+        <div class="col-md-6 text-md-end">
+          <h2 class="fw-bold text-danger">INVOICE</h2>
+          <p class="mb-1"><strong>Invoice #:</strong> {{ bill.bill_id }}</p>
+          <p class="mb-1"><strong>Date:</strong> {{ bill.date.strftime('%d %b %Y, %I:%M %p') }}</p>
+          <p class="mb-0"><strong>Payment:</strong> {{ bill.payment_method.upper() }}</p>
+        </div>
+      </div>
+
+      <!-- Customer -->
+      <div class="bg-light rounded p-3 mb-4">
+        <strong>Bill To:</strong>
+        <p class="mb-0 mt-1">{{ bill.customer.name }}</p>
+        <p class="mb-0 text-muted small">{{ bill.customer.phone or '' }}
+          {% if bill.customer.email %} | {{ bill.customer.email }}{% endif %}
+        </p>
+        <p class="mb-0 text-muted small">{{ bill.customer.address or '' }}</p>
+      </div>
+
+      <!-- Items -->
+      <table class="table table-bordered align-middle mb-4">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th><th>Product</th><th class="text-center">Qty</th>
+            <th class="text-end">Unit Price</th><th class="text-center">GST%</th><th class="text-end">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in bill.items %}
+          {% set amount = item.quantity * item.price * (1 + item.gst / 100) %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.product.name }}</td>
+            <td class="text-center">{{ item.quantity }}</td>
+            <td class="text-end">Rs.{{ "%.2f"|format(item.price) }}</td>
+            <td class="text-center">{{ item.gst }}%</td>
+            <td class="text-end fw-semibold">Rs.{{ "%.2f"|format(amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Totals -->
+      <div class="row justify-content-end">
+        <div class="col-md-4">
+          <table class="table table-sm">
+            <tr><td>Subtotal</td><td class="text-end">Rs.{{ "%.2f"|format(bill.subtotal) }}</td></tr>
+            <tr><td>GST</td><td class="text-end">Rs.{{ "%.2f"|format(bill.gst_amount) }}</td></tr>
+            <tr><td>Discount</td><td class="text-end text-success">- Rs.{{ "%.2f"|format(bill.discount) }}</td></tr>
+            <tr class="table-dark fw-bold fs-5">
+              <td>TOTAL</td><td class="text-end">Rs.{{ "%.2f"|format(bill.total_amount) }}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <hr/>
+      <p class="text-center text-muted small mt-3">Thank you for your business!</p>
+    </div>
+  </div>
+
+  <p class="text-center text-muted small mt-3 no-print">
+    Powered by <strong>BillBook</strong>
+  </p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

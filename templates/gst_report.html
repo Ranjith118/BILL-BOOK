@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}- GST Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>GST Report</h4>
+  <form class="d-flex gap-2" method="GET">
+    <input type="month" name="month" class="form-control form-control-sm" value="{{ month }}"/>
+    <button class="btn btn-primary btn-sm">Filter</button>
+  </form>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm bg-primary text-white text-center p-3">
+      <p class="small mb-1 opacity-75">Taxable Amount</p>
+      <h4 class="fw-bold">Rs.{{ "%.2f"|format(total_taxable) }}</h4>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm bg-warning text-dark text-center p-3">
+      <p class="small mb-1 opacity-75">Total GST Collected</p>
+      <h4 class="fw-bold">Rs.{{ "%.2f"|format(total_gst) }}</h4>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm bg-success text-white text-center p-3">
+      <p class="small mb-1 opacity-75">Total Revenue</p>
+      <h4 class="fw-bold">Rs.{{ "%.2f"|format(total_revenue) }}</h4>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold border-0">GST Breakdown by Rate</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>GST Rate</th><th>Taxable Amount</th><th>GST Collected</th></tr>
+      </thead>
+      <tbody>
+        {% for row in gst_breakdown %}
+        <tr>
+          <td><span class="badge bg-primary">{{ row.rate }}%</span></td>
+          <td>Rs.{{ "%.2f"|format(row.taxable) }}</td>
+          <td class="fw-semibold text-warning">Rs.{{ "%.2f"|format(row.tax) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="text-center text-muted py-3">No data for this month.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold border-0">Bills This Month</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Bill #</th><th>Date</th><th>Customer</th><th>Taxable</th><th>GST</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for b in bills %}
+        <tr>
+          <td>#{{ b.bill_id }}</td>
+          <td>{{ b.date.strftime('%d %b %Y') }}</td>
+          <td>{{ b.customer.name }}</td>
+          <td>Rs.{{ "%.2f"|format(b.subtotal) }}</td>
+          <td>Rs.{{ "%.2f"|format(b.gst_amount) }}</td>
+          <td class="fw-bold">Rs.{{ "%.2f"|format(b.total_amount) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

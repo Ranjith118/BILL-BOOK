@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}- Users{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-person-gear me-2 text-secondary"></i>User Management</h4>
+  <a href="{{ url_for('add_user') }}" class="btn btn-secondary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Add User
+  </a>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr><th>#</th><th>Username</th><th>Role</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td class="fw-semibold">{{ u.username }}</td>
+          <td><span class="badge {{ 'bg-danger' if u.role == 'admin' else 'bg-info text-dark' }}">{{ u.role }}</span></td>
+          <td>
+            {% if u.id != current_user.id %}
+            <form method="POST" action="{{ url_for('delete_user', id=u.id) }}" class="d-inline"
+                  onsubmit="return confirm('Delete user {{ u.username }}?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+            {% else %}
+            <span class="text-muted small">Current user</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

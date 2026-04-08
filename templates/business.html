@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}- Business Info{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-bold border-0 pt-4 ps-4">
+        <i class="bi bi-building me-2 text-primary"></i>Business Information
+      </div>
+      <div class="card-body p-4">
+        <form method="POST" enctype="multipart/form-data">
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="form-label">Business Name</label>
+              <input type="text" name="name" class="form-control" value="{{ biz.name if biz else '' }}"/>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Address</label>
+              <textarea name="address" class="form-control" rows="2">{{ biz.address if biz else '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone</label>
+              <input type="text" name="phone" class="form-control" value="{{ biz.phone if biz else '' }}"/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" value="{{ biz.email if biz else '' }}"/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">GST Number</label>
+              <input type="text" name="gst_number" class="form-control" value="{{ biz.gst_number if biz else '' }}"/>
+            </div>
+
+            <!-- Logo (optional) -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Company Logo <span class="text-muted small">(optional — shown in invoice header)</span>
+              </label>
+              {% if biz and biz.logo %}
+                <div class="d-flex align-items-center gap-3 mb-2">
+                  <img src="{{ url_for('biz_image', kind='logo') }}"
+                       height="50" class="rounded border"/>
+                  <div>
+                    <label class="form-label small mb-1">Replace logo</label>
+                    <input type="file" name="logo" class="form-control form-control-sm" accept="image/*"/>
+                  </div>
+                  <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="clear_logo" id="clearLogo"/>
+                    <label class="form-check-label small text-danger" for="clearLogo">Remove logo</label>
+                  </div>
+                </div>
+              {% else %}
+                <input type="file" name="logo" class="form-control" accept="image/*"/>
+                <div class="form-text">Upload a PNG or JPG. Leave blank to skip.</div>
+              {% endif %}
+              <!-- Logo size selector — shown only if logo exists -->
+              {% if biz and biz.logo %}
+              <div class="mt-2">
+                <label class="form-label small">Logo Size in Invoice</label>
+                <select name="logo_size" class="form-select form-select-sm" style="max-width:180px">
+                  <option value="small"  {{ 'selected' if biz and biz.logo_size == 'small'  }}>Small  (10mm)</option>
+                  <option value="medium" {{ 'selected' if not biz or biz.logo_size in ('medium', None, '') }}>Medium (16mm)</option>
+                  <option value="large"  {{ 'selected' if biz and biz.logo_size == 'large'  }}>Large  (24mm)</option>
+                </select>
+              </div>
+              {% else %}
+              <input type="hidden" name="logo_size" value="medium"/>
+              {% endif %}
+            </div>
+
+            <!-- Signature (optional) -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Authorised Signature Image <span class="text-muted small">(optional — shown at bottom of invoice)</span>
+              </label>
+              {% if biz and biz.signature %}
+                <div class="d-flex align-items-center gap-3 mb-2">
+                  <img src="{{ url_for('biz_image', kind='signature') }}"
+                       height="50" class="rounded border"/>
+                  <div>
+                    <label class="form-label small mb-1">Replace signature</label>
+                    <input type="file" name="signature" class="form-control form-control-sm" accept="image/*"/>
+                  </div>
+                  <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="clear_signature" id="clearSig"/>
+                    <label class="form-check-label small text-danger" for="clearSig">Remove signature</label>
+                  </div>
+                </div>
+              {% else %}
+                <input type="file" name="signature" class="form-control" accept="image/*"/>
+                <div class="form-text">Upload a PNG or JPG of your signature. Leave blank to skip.</div>
+              {% endif %}
+            </div>
+
+            <!-- Terms & Conditions (optional) -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Terms & Conditions <span class="text-muted small">(optional — appears at bottom of invoice)</span>
+              </label>
+              {% if biz and biz.terms %}
+                <div id="termsDisplay">
+                  <div class="border rounded p-3 bg-light small" style="white-space:pre-wrap">{{ biz.terms }}</div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                          onclick="document.getElementById('termsDisplay').style.display='none';
+                                   document.getElementById('termsEdit').style.display='block'">
+                    <i class="bi bi-pencil me-1"></i>Edit Terms
+                  </button>
+                </div>
+                <div id="termsEdit" style="display:none">
+                  <textarea name="terms" class="form-control" rows="4">{{ biz.terms }}</textarea>
+                </div>
+                <input type="hidden" name="terms_hidden" value="{{ biz.terms }}"/>
+              {% else %}
+                <textarea name="terms" class="form-control" rows="4"
+                          placeholder="e.g. Goods once sold will not be taken back. Payment due within 30 days..."></textarea>
+              {% endif %}
+            </div>
+
+          </div>
+
+          <button type="submit" class="btn btn-primary mt-4">
+            <i class="bi bi-save me-1"></i>Save Business Details
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
