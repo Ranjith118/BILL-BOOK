@@ -20,13 +20,13 @@ app.config['SECRET_KEY'] = os.environ.get('BILLBOOK_SECRET', 'billbook-change-in
 
 # Use PostgreSQL on Render, SQLite locally
 database_url = os.environ.get('DATABASE_URL', '')
-if database_url.startswith('postgres://'):
-    # Render gives postgres:// but SQLAlchemy needs postgresql://
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-if not database_url:
+if database_url:
+    # pg8000 is pure Python — works on any Python version
+    database_url = database_url.replace('postgres://', 'postgresql+pg8000://')
+    database_url = database_url.replace('postgresql://', 'postgresql+pg8000://')
+else:
     database_url = 'sqlite:///' + os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'instance', 'billbook.db')
-
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'images')
