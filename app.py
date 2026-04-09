@@ -268,27 +268,24 @@ def dashboard():
         low_stock = Product.query.filter(Product.stock < 5).all()
 
         try:
+            monthly_expr = func.to_char(Bill.date, 'YYYY-MM')
             monthly = db.session.query(
-                func.to_char(Bill.date, 'YYYY-MM').label('month'),
+                monthly_expr.label('month'),
                 func.sum(Bill.total_amount).label('revenue')
-            ).group_by(func.to_char(Bill.date, 'YYYY-MM')).order_by('month').limit(6).all()
+            ).group_by(monthly_expr).order_by(monthly_expr).limit(6).all()
         except Exception:
-            monthly = db.session.query(
-                func.strftime('%Y-%m', Bill.date).label('month'),
-                func.sum(Bill.total_amount).label('revenue')
-            ).group_by('month').order_by('month').limit(6).all()
+            db.session.rollback()
+            monthly = []
 
         try:
+            daily_expr = func.to_char(Bill.date, 'DD-MM')
             daily = db.session.query(
-                func.to_char(Bill.date, 'DD-MM').label('day'),
+                daily_expr.label('day'),
                 func.sum(Bill.total_amount).label('sales')
-            ).filter(Bill.date >= seven_days_ago).group_by(
-                func.to_char(Bill.date, 'DD-MM')).order_by('day').all()
+            ).filter(Bill.date >= seven_days_ago).group_by(daily_expr).order_by(daily_expr).all()
         except Exception:
-            daily = db.session.query(
-                func.strftime('%d-%m', Bill.date).label('day'),
-                func.sum(Bill.total_amount).label('sales')
-            ).filter(Bill.date >= seven_days_ago).group_by('day').order_by('day').all()
+            db.session.rollback()
+            daily = []
 
         return render_template('dashboard.html',
             total_sales_today=total_sales_today, total_bills=total_bills,
@@ -298,8 +295,13 @@ def dashboard():
             daily_labels=[r.day for r in daily], daily_data=[r.sales for r in daily],
         )
     except Exception as e:
-        import traceback
-        return f"<pre>Dashboard Error:\n{traceback.format_exc()}</pre>", 500
+        db.session.rollback()
+        return render_template('dashboard.html',
+            total_sales_today=0, total_bills=0,
+            total_customers=0, total_products=0,
+            low_stock=[], monthly_labels=[], monthly_data=[],
+            daily_labels=[], daily_data=[],
+        )
 
 # ─── Business ────────────────────────────────────────────────────────────────
 
