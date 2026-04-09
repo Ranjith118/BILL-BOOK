@@ -776,6 +776,13 @@ def create_tables():
         db.create_all()
 
 # Run migrations and create tables on startup
+def create_tables():
+    with app.app_context():
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f"Warning: Could not create tables: {e}")
+
 create_tables()
 
 if __name__ == '__main__':
