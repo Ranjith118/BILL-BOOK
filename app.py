@@ -19,14 +19,16 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('BILLBOOK_SECRET', 'billbook-change-in-production')
 
 # Use PostgreSQL on Render, SQLite locally
+# Use PostgreSQL if DATABASE_URL is set, otherwise SQLite
 database_url = os.environ.get('DATABASE_URL', '')
-print(f"[DB RAW] DATABASE_URL = {os.environ.get('DATABASE_URL', 'NOT SET')[:80]}")
 if database_url:
     database_url = database_url.replace('postgres://', 'postgresql+pg8000://')
     database_url = database_url.replace('postgresql://', 'postgresql+pg8000://')
 else:
-    database_url = 'sqlite:///' + os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), 'instance', 'billbook.db')
+    # SQLite for local dev and when no DB is configured
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'billbook.db')
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    database_url = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'images')
