@@ -3,7 +3,7 @@ services:
     name: billbook
     runtime: python
     rootDir: .
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip uninstall -y psycopg2 psycopg2-binary || true && pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: BILLBOOK_SECRET
