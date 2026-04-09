@@ -253,21 +253,43 @@ def dashboard():
     if not Business.query.first():
         return redirect(url_for('setup'))
     today = date.today()
-    total_sales_today = db.session.query(func.sum(Bill.total_amount)).filter(
-        func.date(Bill.date) == today).scalar() or 0
+    seven_days_ago = today - timedelta(days=7)
+
+    try:
+        total_sales_today = db.session.query(func.sum(Bill.total_amount)).filter(
+            func.cast(Bill.date, db.Date) == today).scalar() or 0
+    except Exception:
+        total_sales_today = 0
+
     total_bills = Bill.query.count()
     total_customers = Customer.query.count()
     total_products = Product.query.count()
     low_stock = Product.query.filter(Product.stock < 5).all()
-    monthly = db.session.query(
-        func.strftime('%Y-%m', Bill.date).label('month'),
-        func.sum(Bill.total_amount).label('revenue')
-    ).group_by('month').order_by('month').limit(6).all()
-    daily = db.session.query(
-        func.strftime('%d-%m', Bill.date).label('day'),
-        func.sum(Bill.total_amount).label('sales')
-    ).filter(func.date(Bill.date) >= func.date('now', '-7 days')
-    ).group_by('day').order_by('day').all()
+
+    try:
+        monthly = db.session.query(
+            func.to_char(Bill.date, 'YYYY-MM').label('month'),
+            func.sum(Bill.total_amount).label('revenue')
+        ).group_by(func.to_char(Bill.date, 'YYYY-MM')).order_by('month').limit(6).all()
+    except Exception:
+        # SQLite fallback
+        monthly = db.session.query(
+            func.strftime('%Y-%m', Bill.date).label('month'),
+            func.sum(Bill.total_amount).label('revenue')
+        ).group_by('month').order_by('month').limit(6).all()
+
+    try:
+        daily = db.session.query(
+            func.to_char(Bill.date, 'DD-MM').label('day'),
+            func.sum(Bill.total_amount).label('sales')
+        ).filter(Bill.date >= seven_days_ago).group_by(
+            func.to_char(Bill.date, 'DD-MM')).order_by('day').all()
+    except Exception:
+        daily = db.session.query(
+            func.strftime('%d-%m', Bill.date).label('day'),
+            func.sum(Bill.total_amount).label('sales')
+        ).filter(Bill.date >= seven_days_ago).group_by('day').order_by('day').all()
+
     return render_template('dashboard.html',
         total_sales_today=total_sales_today, total_bills=total_bills,
         total_customers=total_customers, total_products=total_products,
@@ -545,7 +567,7 @@ def bills():
     if q and q.isdigit():
         query = query.filter(Bill.bill_id == int(q))
     if date_filter:
-        query = query.filter(func.date(Bill.date) == date_filter)
+        query = query.filter(func.cast(Bill.date, db.Date) == date_filter)
     return render_template('bills.html', bills=query.order_by(Bill.date.desc()).all(),
                            q=q, date_filter=date_filter)
 
@@ -567,11 +589,20 @@ def reports():
         Product.name, func.sum(BillItem.quantity).label('total_qty')
     ).join(BillItem).group_by(Product.product_id)\
      .order_by(func.sum(BillItem.quantity).desc()).limit(5).all()
-    monthly = db.session.query(
-        func.strftime('%b %Y', Bill.date).label('month'),
-        func.sum(Bill.total_amount).label('revenue')
-    ).group_by(func.strftime('%Y-%m', Bill.date))\
-     .order_by(func.strftime('%Y-%m', Bill.date)).limit(12).all()
+
+    try:
+        monthly = db.session.query(
+            func.to_char(Bill.date, 'Mon YYYY').label('month'),
+            func.sum(Bill.total_amount).label('revenue')
+        ).group_by(func.to_char(Bill.date, 'YYYY-MM'), func.to_char(Bill.date, 'Mon YYYY'))\
+         .order_by(func.to_char(Bill.date, 'YYYY-MM')).limit(12).all()
+    except Exception:
+        monthly = db.session.query(
+            func.strftime('%b %Y', Bill.date).label('month'),
+            func.sum(Bill.total_amount).label('revenue')
+        ).group_by(func.strftime('%Y-%m', Bill.date))\
+         .order_by(func.strftime('%Y-%m', Bill.date)).limit(12).all()
+
     total_revenue = db.session.query(func.sum(Bill.total_amount)).scalar() or 0
     return render_template('reports.html',
         top_products=top_products,
