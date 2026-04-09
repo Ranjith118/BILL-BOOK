@@ -20,8 +20,8 @@ app.config['SECRET_KEY'] = os.environ.get('BILLBOOK_SECRET', 'billbook-change-in
 
 # Use PostgreSQL on Render, SQLite locally
 database_url = os.environ.get('DATABASE_URL', '')
+print(f"[DB RAW] DATABASE_URL = {os.environ.get('DATABASE_URL', 'NOT SET')[:80]}")
 if database_url:
-    # pg8000 is pure Python — works on any Python version
     database_url = database_url.replace('postgres://', 'postgresql+pg8000://')
     database_url = database_url.replace('postgresql://', 'postgresql+pg8000://')
 else:
