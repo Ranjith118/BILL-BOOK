@@ -252,51 +252,54 @@ def logout():
 def dashboard():
     if not Business.query.first():
         return redirect(url_for('setup'))
-    today = date.today()
-    seven_days_ago = today - timedelta(days=7)
-
     try:
-        total_sales_today = db.session.query(func.sum(Bill.total_amount)).filter(
-            func.cast(Bill.date, db.Date) == today).scalar() or 0
-    except Exception:
-        total_sales_today = 0
+        today = date.today()
+        seven_days_ago = today - timedelta(days=7)
 
-    total_bills = Bill.query.count()
-    total_customers = Customer.query.count()
-    total_products = Product.query.count()
-    low_stock = Product.query.filter(Product.stock < 5).all()
+        try:
+            total_sales_today = db.session.query(func.sum(Bill.total_amount)).filter(
+                func.cast(Bill.date, db.Date) == today).scalar() or 0
+        except Exception:
+            total_sales_today = 0
 
-    try:
-        monthly = db.session.query(
-            func.to_char(Bill.date, 'YYYY-MM').label('month'),
-            func.sum(Bill.total_amount).label('revenue')
-        ).group_by(func.to_char(Bill.date, 'YYYY-MM')).order_by('month').limit(6).all()
-    except Exception:
-        # SQLite fallback
-        monthly = db.session.query(
-            func.strftime('%Y-%m', Bill.date).label('month'),
-            func.sum(Bill.total_amount).label('revenue')
-        ).group_by('month').order_by('month').limit(6).all()
+        total_bills = Bill.query.count()
+        total_customers = Customer.query.count()
+        total_products = Product.query.count()
+        low_stock = Product.query.filter(Product.stock < 5).all()
 
-    try:
-        daily = db.session.query(
-            func.to_char(Bill.date, 'DD-MM').label('day'),
-            func.sum(Bill.total_amount).label('sales')
-        ).filter(Bill.date >= seven_days_ago).group_by(
-            func.to_char(Bill.date, 'DD-MM')).order_by('day').all()
-    except Exception:
-        daily = db.session.query(
-            func.strftime('%d-%m', Bill.date).label('day'),
-            func.sum(Bill.total_amount).label('sales')
-        ).filter(Bill.date >= seven_days_ago).group_by('day').order_by('day').all()
+        try:
+            monthly = db.session.query(
+                func.to_char(Bill.date, 'YYYY-MM').label('month'),
+                func.sum(Bill.total_amount).label('revenue')
+            ).group_by(func.to_char(Bill.date, 'YYYY-MM')).order_by('month').limit(6).all()
+        except Exception:
+            monthly = db.session.query(
+                func.strftime('%Y-%m', Bill.date).label('month'),
+                func.sum(Bill.total_amount).label('revenue')
+            ).group_by('month').order_by('month').limit(6).all()
 
-    return render_template('dashboard.html',
-        total_sales_today=total_sales_today, total_bills=total_bills,
-        total_customers=total_customers, total_products=total_products,
-        low_stock=low_stock,
-        monthly_labels=[r.month for r in monthly], monthly_data=[r.revenue for r in monthly],
-        daily_labels=[r.day for r in daily], daily_data=[r.sales for r in daily],
-    )
+        try:
+            daily = db.session.query(
+                func.to_char(Bill.date, 'DD-MM').label('day'),
+                func.sum(Bill.total_amount).label('sales')
+            ).filter(Bill.date >= seven_days_ago).group_by(
+                func.to_char(Bill.date, 'DD-MM')).order_by('day').all()
+        except Exception:
+            daily = db.session.query(
+                func.strftime('%d-%m', Bill.date).label('day'),
+                func.sum(Bill.total_amount).label('sales')
+            ).filter(Bill.date >= seven_days_ago).group_by('day').order_by('day').all()
+
+        return render_template('dashboard.html',
+            total_sales_today=total_sales_today, total_bills=total_bills,
+            total_customers=total_customers, total_products=total_products,
+            low_stock=low_stock,
+            monthly_labels=[r.month for r in monthly], monthly_data=[r.revenue for r in monthly],
+            daily_labels=[r.day for r in daily], daily_data=[r.sales for r in daily],
+        )
+    except Exception as e:
+        import traceback
+        return f"<pre>Dashboard Error:\n{traceback.format_exc()}</pre>", 500
 
 # ─── Business ────────────────────────────────────────────────────────────────
 
