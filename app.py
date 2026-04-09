@@ -592,21 +592,19 @@ def delete_bill(bill_id):
 def reports():
     top_products = db.session.query(
         Product.name, func.sum(BillItem.quantity).label('total_qty')
-    ).join(BillItem).group_by(Product.product_id)\
+    ).join(BillItem).group_by(Product.product_id, Product.name)\
      .order_by(func.sum(BillItem.quantity).desc()).limit(5).all()
 
     try:
+        month_expr = func.to_char(Bill.date, 'Mon YYYY')
+        sort_expr  = func.to_char(Bill.date, 'YYYY-MM')
         monthly = db.session.query(
-            func.to_char(Bill.date, 'Mon YYYY').label('month'),
+            month_expr.label('month'),
             func.sum(Bill.total_amount).label('revenue')
-        ).group_by(func.to_char(Bill.date, 'YYYY-MM'), func.to_char(Bill.date, 'Mon YYYY'))\
-         .order_by(func.to_char(Bill.date, 'YYYY-MM')).limit(12).all()
+        ).group_by(month_expr, sort_expr).order_by(sort_expr).limit(12).all()
     except Exception:
-        monthly = db.session.query(
-            func.strftime('%b %Y', Bill.date).label('month'),
-            func.sum(Bill.total_amount).label('revenue')
-        ).group_by(func.strftime('%Y-%m', Bill.date))\
-         .order_by(func.strftime('%Y-%m', Bill.date)).limit(12).all()
+        db.session.rollback()
+        monthly = []
 
     total_revenue = db.session.query(func.sum(Bill.total_amount)).scalar() or 0
     return render_template('reports.html',
