@@ -215,6 +215,7 @@ def register_verify_otp():
 # ─── Password-based Login & Register ─────────────────────────────────────────
 
 @app.route('/setup', methods=['GET', 'POST'])
+@app.route('/setup', methods=['GET', 'POST'])
 @login_required
 def setup():
     if request.method == 'POST':
@@ -223,14 +224,15 @@ def setup():
             f = request.files['logo']
             logo_filename = secure_filename(f.filename)
             f.save(os.path.join(app.config['UPLOAD_FOLDER'], logo_filename))
-        biz = Business.query.first()
+        biz = Business.query.filter_by(user_id=current_user.id).first()
         if biz:
             biz.name = request.form['name']; biz.address = request.form['address']
             biz.phone = request.form['phone']; biz.email = request.form['email']
             biz.gst_number = request.form['gst_number']
             if logo_filename: biz.logo = logo_filename
         else:
-            biz = Business(name=request.form['name'], address=request.form['address'],
+            biz = Business(user_id=current_user.id,
+                           name=request.form['name'], address=request.form['address'],
                            phone=request.form['phone'], email=request.form['email'],
                            gst_number=request.form['gst_number'], logo=logo_filename)
             db.session.add(biz)
@@ -250,65 +252,72 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if not Business.query.first():
+    if not Business.query.filter_by(user_id=current_user.id).first():
         return redirect(url_for('setup'))
-    try:
-        today = date.today()
-        seven_days_ago = today - timedelta(days=7)
 
-        try:
+    today = date.today()
+    seven_days_ago = today - timedelta(days=7)
+    is_postgres = 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI']
+
+    # Today's sales
+    try:
+        if is_postgres:
             total_sales_today = db.session.query(func.sum(Bill.total_amount)).filter(
                 func.cast(Bill.date, db.Date) == today).scalar() or 0
-        except Exception:
-            total_sales_today = 0
-
-        total_bills = Bill.query.count()
-        total_customers = Customer.query.count()
-        total_products = Product.query.count()
-        low_stock = Product.query.filter(Product.stock < 5).all()
-
-        try:
-            monthly_expr = func.to_char(Bill.date, 'YYYY-MM')
-            monthly = db.session.query(
-                monthly_expr.label('month'),
-                func.sum(Bill.total_amount).label('revenue')
-            ).group_by(monthly_expr).order_by(monthly_expr).limit(6).all()
-        except Exception:
-            db.session.rollback()
-            monthly = []
-
-        try:
-            daily_expr = func.to_char(Bill.date, 'DD-MM')
-            daily = db.session.query(
-                daily_expr.label('day'),
-                func.sum(Bill.total_amount).label('sales')
-            ).filter(Bill.date >= seven_days_ago).group_by(daily_expr).order_by(daily_expr).all()
-        except Exception:
-            db.session.rollback()
-            daily = []
-
-        return render_template('dashboard.html',
-            total_sales_today=total_sales_today, total_bills=total_bills,
-            total_customers=total_customers, total_products=total_products,
-            low_stock=low_stock,
-            monthly_labels=[r.month for r in monthly], monthly_data=[r.revenue for r in monthly],
-            daily_labels=[r.day for r in daily], daily_data=[r.sales for r in daily],
-        )
-    except Exception as e:
+        else:
+            total_sales_today = db.session.query(func.sum(Bill.total_amount)).filter(
+                func.date(Bill.date) == today.isoformat()).scalar() or 0
+    except Exception:
         db.session.rollback()
-        return render_template('dashboard.html',
-            total_sales_today=0, total_bills=0,
-            total_customers=0, total_products=0,
-            low_stock=[], monthly_labels=[], monthly_data=[],
-            daily_labels=[], daily_data=[],
-        )
+        total_sales_today = 0
+
+    total_bills     = Bill.query.join(Customer).filter(Customer.user_id == current_user.id).count()
+    total_customers = Customer.query.filter_by(user_id=current_user.id).count()
+    total_products  = Product.query.filter_by(user_id=current_user.id).count()
+    low_stock       = Product.query.filter_by(user_id=current_user.id).filter(Product.stock < 5).all()
+
+    # Monthly revenue chart
+    try:
+        if is_postgres:
+            monthly_expr = func.to_char(Bill.date, 'YYYY-MM')
+        else:
+            monthly_expr = func.strftime('%Y-%m', Bill.date)
+        monthly = db.session.query(
+            monthly_expr.label('month'),
+            func.sum(Bill.total_amount).label('revenue')
+        ).group_by(monthly_expr).order_by(monthly_expr).limit(6).all()
+    except Exception:
+        db.session.rollback()
+        monthly = []
+
+    # Daily sales chart (last 7 days)
+    try:
+        if is_postgres:
+            daily_expr = func.to_char(Bill.date, 'DD-MM')
+        else:
+            daily_expr = func.strftime('%d-%m', Bill.date)
+        daily = db.session.query(
+            daily_expr.label('day'),
+            func.sum(Bill.total_amount).label('sales')
+        ).filter(Bill.date >= seven_days_ago).group_by(daily_expr).order_by(daily_expr).all()
+    except Exception:
+        db.session.rollback()
+        daily = []
+
+    return render_template('dashboard.html',
+        total_sales_today=total_sales_today, total_bills=total_bills,
+        total_customers=total_customers, total_products=total_products,
+        low_stock=low_stock,
+        monthly_labels=[r.month for r in monthly], monthly_data=[r.revenue for r in monthly],
+        daily_labels=[r.day for r in daily], daily_data=[r.sales for r in daily],
+    )
 
 # ─── Business ────────────────────────────────────────────────────────────────
 
 @app.route('/business', methods=['GET', 'POST'])
 @login_required
 def business():
-    biz = Business.query.first()
+    biz = Business.query.filter_by(user_id=current_user.id).first()
     if request.method == 'POST':
         logo_filename = biz.logo if biz else None
         sig_filename  = biz.signature if biz else None
@@ -348,7 +357,7 @@ def business():
         if biz:
             for k, v in data.items(): setattr(biz, k, v)
         else:
-            biz = Business(**data); db.session.add(biz)
+            biz = Business(user_id=current_user.id, **data); db.session.add(biz)
         db.session.commit()
         flash('Business details saved.', 'success')
         return redirect(url_for('business'))
@@ -373,7 +382,7 @@ def biz_image(kind):
 @login_required
 def customers():
     q = request.args.get('q', '')
-    query = Customer.query
+    query = Customer.query.filter_by(user_id=current_user.id)
     if q:
         query = query.filter(Customer.name.ilike(f'%{q}%') | Customer.phone.ilike(f'%{q}%'))
     return render_template('customers.html', customers=query.all(), q=q)
@@ -390,7 +399,7 @@ def customer_bills(id):
 @login_required
 def add_customer():
     if request.method == 'POST':
-        c = Customer(name=request.form['name'], phone=request.form['phone'],
+        c = Customer(user_id=current_user.id, name=request.form['name'], phone=request.form['phone'],
                      address=request.form['address'], email=request.form['email'])
         db.session.add(c); db.session.commit()
         flash('Customer added.', 'success')
@@ -422,7 +431,7 @@ def delete_customer(id):
 @login_required
 def products():
     q = request.args.get('q', '')
-    query = Product.query
+    query = Product.query.filter_by(user_id=current_user.id)
     if q:
         query = query.filter(Product.name.ilike(f'%{q}%') | Product.category.ilike(f'%{q}%'))
     return render_template('products.html', products=query.all(), q=q)
@@ -431,7 +440,7 @@ def products():
 @login_required
 def add_product():
     if request.method == 'POST':
-        p = Product(name=request.form['name'], category=request.form['category'],
+        p = Product(user_id=current_user.id, name=request.form['name'], category=request.form['category'],
                     price=float(request.form['price']), stock=int(request.form['stock']),
                     gst=float(request.form['gst']), description=request.form['description'],
                     barcode=request.form.get('barcode') or None)
@@ -479,8 +488,8 @@ def api_product_barcode(code):
 @app.route('/billing', methods=['GET', 'POST'])
 @login_required
 def billing():
-    customers_list = Customer.query.all()
-    products_list = Product.query.all()
+    customers_list = Customer.query.filter_by(user_id=current_user.id).all()
+    products_list = Product.query.filter_by(user_id=current_user.id).all()
     biz = Business.query.first()
     default_terms = biz.terms if biz and biz.terms else ''
     if request.method == 'POST':
@@ -522,7 +531,7 @@ def _invoice_pdf_path(bill_id):
     return os.path.join(folder, f'invoice_{bill_id}.pdf')
 
 def _save_invoice_pdf(bill):
-    biz = Business.query.first()
+    biz = Business.query.filter_by(user_id=bill.customer.user_id).first()
     buf = generate_invoice_pdf(bill, biz)
     with open(_invoice_pdf_path(bill.bill_id), 'wb') as f:
         f.write(buf.read())
@@ -568,7 +577,7 @@ def invoice_share(bill_id):
 def bills():
     q = request.args.get('q', '').strip()
     date_filter = request.args.get('date', '').strip()
-    query = Bill.query
+    query = Bill.query.join(Customer).filter(Customer.user_id == current_user.id)
     if q and q.isdigit():
         query = query.filter(Bill.bill_id == int(q))
     if date_filter:
@@ -590,18 +599,27 @@ def delete_bill(bill_id):
 @app.route('/reports')
 @login_required
 def reports():
+    is_postgres = 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI']
+
     top_products = db.session.query(
         Product.name, func.sum(BillItem.quantity).label('total_qty')
     ).join(BillItem).group_by(Product.product_id, Product.name)\
      .order_by(func.sum(BillItem.quantity).desc()).limit(5).all()
 
     try:
-        month_expr = func.to_char(Bill.date, 'Mon YYYY')
-        sort_expr  = func.to_char(Bill.date, 'YYYY-MM')
-        monthly = db.session.query(
-            month_expr.label('month'),
-            func.sum(Bill.total_amount).label('revenue')
-        ).group_by(month_expr, sort_expr).order_by(sort_expr).limit(12).all()
+        if is_postgres:
+            month_expr = func.to_char(Bill.date, 'Mon YYYY')
+            sort_expr  = func.to_char(Bill.date, 'YYYY-MM')
+            monthly = db.session.query(
+                month_expr.label('month'),
+                func.sum(Bill.total_amount).label('revenue')
+            ).group_by(month_expr, sort_expr).order_by(sort_expr).limit(12).all()
+        else:
+            monthly = db.session.query(
+                func.strftime('%b %Y', Bill.date).label('month'),
+                func.sum(Bill.total_amount).label('revenue')
+            ).group_by(func.strftime('%Y-%m', Bill.date))\
+             .order_by(func.strftime('%Y-%m', Bill.date)).limit(12).all()
     except Exception:
         db.session.rollback()
         monthly = []

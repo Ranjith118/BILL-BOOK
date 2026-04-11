@@ -28,6 +28,7 @@ class OTP(db.Model):
 class Business(db.Model):
     __tablename__ = 'business'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     name = db.Column(db.String(120))
     address = db.Column(db.Text)
     phone = db.Column(db.String(20))
@@ -37,7 +38,6 @@ class Business(db.Model):
     logo_size = db.Column(db.String(10), default='medium')
     signature = db.Column(db.String(200), nullable=True)
     terms = db.Column(db.Text, nullable=True)
-    # Binary storage for cloud hosting (images stored in DB)
     logo_data = db.Column(db.LargeBinary, nullable=True)
     logo_mimetype = db.Column(db.String(50), nullable=True)
     signature_data = db.Column(db.LargeBinary, nullable=True)
@@ -46,6 +46,7 @@ class Business(db.Model):
 class Customer(db.Model):
     __tablename__ = 'customers'
     customer_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     name = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(20))
     address = db.Column(db.Text)
@@ -55,13 +56,14 @@ class Customer(db.Model):
 class Product(db.Model):
     __tablename__ = 'products'
     product_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     name = db.Column(db.String(120), nullable=False)
     category = db.Column(db.String(80))
     price = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, default=0)
     gst = db.Column(db.Float, default=0.0)
     description = db.Column(db.Text)
-    barcode = db.Column(db.String(100), unique=True)
+    barcode = db.Column(db.String(100))
 
 class Bill(db.Model):
     __tablename__ = 'bills'

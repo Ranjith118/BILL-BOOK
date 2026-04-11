@@ -120,36 +120,48 @@ def generate_invoice_pdf(bill, business):
     STATIC_IMG = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'images')
 
     def _load_image(filename, height=14*mm, data=None, mimetype=None):
-        """Load image — from DB bytes first, fallback to filesystem."""
-        if data:
+        """Load image constrained to fit within column — never overflows."""
+        PADDING = 4 * mm  # padding inside the cell on each side
+
+        def _make_image(source, is_bytes=False):
             try:
                 from PIL import Image as PILImage
-                pil_img = PILImage.open(io.BytesIO(data))
+                if is_bytes:
+                    pil_img = PILImage.open(io.BytesIO(source))
+                else:
+                    pil_img = PILImage.open(source)
                 orig_w, orig_h = pil_img.size
-                max_w = height * 1.5
-                scaled_w = (orig_w / orig_h) * height
-                if scaled_w > max_w:
-                    scaled_w = max_w
-                    height = max_w * orig_h / orig_w
-                img_buf = io.BytesIO(data)
-                return Image(img_buf, width=scaled_w, height=height)
+
+                # Max dimensions: height = LOGO_H, width = LOGO_COL_W - 2*PADDING
+                max_h = height
+                max_w = height * 1.5 - PADDING * 2  # column width minus padding
+
+                # Scale to fit within both constraints
+                scale_by_h = max_h / orig_h
+                scale_by_w = max_w / orig_w
+                scale = min(scale_by_h, scale_by_w)
+
+                final_w = orig_w * scale
+                final_h = orig_h * scale
+
+                if is_bytes:
+                    return Image(io.BytesIO(source), width=final_w, height=final_h)
+                else:
+                    return Image(source, width=final_w, height=final_h)
             except Exception:
-                pass
-        if not filename: return None
+                return None
+
+        if data:
+            img = _make_image(data, is_bytes=True)
+            if img:
+                return img
+
+        if not filename:
+            return None
         path = os.path.join(STATIC_IMG, filename)
-        if not os.path.isfile(path): return None
-        try:
-            from PIL import Image as PILImage
-            with PILImage.open(path) as pil_img:
-                orig_w, orig_h = pil_img.size
-            max_w = height * 1.5
-            scaled_w = (orig_w / orig_h) * height
-            if scaled_w > max_w:
-                scaled_w = max_w
-                height = max_w * orig_h / orig_w
-            return Image(path, width=scaled_w, height=height)
-        except Exception:
-            return Image(path, width=height, height=height)
+        if not os.path.isfile(path):
+            return None
+        return _make_image(path, is_bytes=False)
 
     logo_img = _load_image(logo_path, LOGO_H,
                            data=_biz('logo_data'), mimetype=_biz('logo_mimetype'))
@@ -181,7 +193,7 @@ def generate_invoice_pdf(bill, business):
 
     # ── Dynamic header: 3 cols if logo, 2 cols if no logo ────────────────────
     if logo_img:
-        # Fixed logo column width — image is already constrained to fit inside
+        # Fixed logo column — width based on LOGO_H with padding
         LOGO_COL_W = LOGO_H * 1.5
         BIZ_COL_W  = LEFT_W - LOGO_COL_W
         logo_img.hAlign = 'CENTER'
@@ -190,10 +202,10 @@ def generate_invoice_pdf(bill, business):
         logo_cell.setStyle(TableStyle([
             ('ALIGN',         (0,0),(-1,-1), 'CENTER'),
             ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
-            ('TOPPADDING',    (0,0),(-1,-1), 5),
-            ('BOTTOMPADDING', (0,0),(-1,-1), 5),
-            ('LEFTPADDING',   (0,0),(-1,-1), 3),
-            ('RIGHTPADDING',  (0,0),(-1,-1), 3),
+            ('TOPPADDING',    (0,0),(-1,-1), 4),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 4),
+            ('LEFTPADDING',   (0,0),(-1,-1), 4),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 4),
             ('OVERFLOW',      (0,0),(-1,-1), 'HIDDEN'),
         ]))
 
